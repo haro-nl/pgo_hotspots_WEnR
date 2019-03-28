@@ -9,15 +9,25 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import geopandas as gp
 import pandas as pd
+import pickle
+import rasterio as rio
 
 def query_all_obs(query):
     # returns pandas dataframe of all observations, file locations are hard-coded
 
+    relevant_cols = ['periode', 'snl', 'n', 'hok_id', 'soortlijst', 'soortgroep']
+    drop_cols = ['snl', 'soortgroep']
+
     try:
-        vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all.txt', comment='#', sep=';')
-        plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all2.csv', comment='#', sep=';')
-        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all2.csv', comment='#', sep=';')
-        return pd.concat([vlinder.query(query), plant.query(query), vogel.query(query)])
+        vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all.txt', comment='#', sep=';',
+                              usecols=relevant_cols)
+        plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all2.csv', comment='#', sep=';',
+                            usecols=relevant_cols)
+        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all2.csv',
+                            comment='#', sep=';', usecols=relevant_cols)
+        return pd.concat([vlinder.query(query).drop(drop_cols, axis=1),
+                          plant.query(query).drop(drop_cols, axis=1),
+                          vogel.query(query).drop(drop_cols, axis=1)])
 
     except OSError:
         raise Exception('You\'re trying to open a files that lives only on the laptop of Hans Roelofsen, bad luck son.')
@@ -29,7 +39,8 @@ def get_all_obs():
     try:
         vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all.txt', comment='#', sep=';')
         plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all2.csv', comment='#', sep=';')
-        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all2.csv', comment='#', sep=';')
+        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all2.csv',
+                            comment='#', sep=';')
         return pd.concat([vogel, plant, vlinder])
 
     except OSError:
@@ -37,9 +48,10 @@ def get_all_obs():
 
 
 
-def diff_to_png(gdf, title, comment, col, cats, background, background_cells, out_dir, out_name):
+def diff_to_png(gdf, title, comment, col, cats, cat_cols, background, background_cells, out_dir, out_name):
     # background images of Provincies - hardcoded.
     prov = gp.read_file(os.path.join(r'm:\a_Projects\Natuurwaarden\agpro\natuurwaarden\shp', 'provincies.shp'))
+    prov_grenzen = gp.read_file(r'd:\NL\provincie_grenzen\provincie_grenzen_v2.shp')
 
     fig = plt.figure(figsize=(8,10))
     ax = fig.add_subplot(111)
@@ -48,22 +60,23 @@ def diff_to_png(gdf, title, comment, col, cats, background, background_cells, ou
     ax.set(title=title)
     ax.set(xlim=[0, 300000], ylim=[300000, 650000])
 
-    prov.plot(ax=ax, color='lightgrey')
+    prov.plot(ax=ax, color='white')
 
     if background:
         background_cells.plot(ax=ax, color='orange', linewidth=0)
 
     legend_patches = []
-    for cat, color in cats.items():
-        legend_patches.append(mpatches.Patch(label=cat, edgecolor='black', facecolor=color))
+    for cat in cats:
+        legend_patches.append(mpatches.Patch(label=cat, edgecolor='black', facecolor=cat_cols[cat]))
 
-    for cat, colour in cats.items():
+    for cat in cats:
         sel = gdf.loc[gdf[col] == cat, :]
         # print('{0} df nrow: {1}'.format(cat, sel.shape[0]))
-        sel.plot(ax=ax, linewidth=0, color=colour)
+        sel.plot(ax=ax, linewidth=0, color=cat_cols[cat], label=cat)
+
+    prov_grenzen.plot(ax=ax, color='black')
 
     ax.text(1000, 301000, comment, ha='left', va='center', size=6)
-
     plt.legend(handles=legend_patches, loc='upper left', fontsize='small', frameon=False, title='Toe/Afname')
     plt.savefig(os.path.join(out_dir, out_name))
     plt.close
@@ -123,3 +136,28 @@ def get_timestring(type):
         return t0.strftime("%y%m%d-%H%M")
     else:
         return t0
+
+
+def get_snl_hokids(snl, treshold):
+    # function to get df of 250m hokken from *snl* beheertypes and/or ecosysteemtypes where the area exceeds *treshold*
+    # returns df where: hok_id = hok_id, snl_count = aantal snl types aanwezig in hok
+    # reads pickled PD dataframes of of snl type, hard-coded to Hans Roelofsen laptop
+
+    # always iterate of the requested snl types
+    if not isinstance(snl, list):
+        snl = [snl]
+
+    # read and concatenate all requested snl type pickles
+    holder = []
+    augurken_dir = r'd:\hotspot_working\a_broedvogels\SNL_grids\augurken'
+    for snl_type in snl:
+        with open(os.path.join(augurken_dir, snl_type + '.pkl'), 'rb') as handle:
+            df = pickle.load(handle)
+            holder.append(df.loc[df['area_m2'] >= treshold, :])
+    snl = pd.concat(holder)
+
+    # pivot on hok_id and report number of snl types per hok_id
+    print('\t\tFound {0} cells from {1} SNL type(s) with area gte {2}'.format(len(set(snl['hok_id'])),
+                                                                          len(snl), str(treshold)))
+    return pd.DataFrame(pd.pivot_table(data=snl, index='hok_id', values='area_m2',
+                                       aggfunc='count')).rename(columns={'area_m2':'snl_type_count'})
