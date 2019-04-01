@@ -47,10 +47,9 @@ def get_all_obs():
         raise Exception('You\'re trying to open a files that lives only on the laptop of Hans Roelofsen, bad luck son.')
 
 
-
 def diff_to_png(gdf, title, comment, col, cats, cat_cols, background, background_cells, out_dir, out_name):
     # background images of Provincies - hardcoded.
-    prov = gp.read_file(os.path.join(r'm:\a_Projects\Natuurwaarden\agpro\natuurwaarden\shp', 'provincies.shp'))
+    prov = gp.read_file(os.path.join(r'd:\NL\provincies', 'provincies.shp'))
     prov_grenzen = gp.read_file(r'd:\NL\provincie_grenzen\provincie_grenzen_v2.shp')
 
     fig = plt.figure(figsize=(8,10))
