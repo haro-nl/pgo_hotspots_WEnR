@@ -25,9 +25,7 @@ def query_all_obs(query):
                             usecols=relevant_cols)
         vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all2.csv',
                             comment='#', sep=';', usecols=relevant_cols)
-        return pd.concat([vlinder.query(query).drop(drop_cols, axis=1),
-                          plant.query(query).drop(drop_cols, axis=1),
-                          vogel.query(query).drop(drop_cols, axis=1)])
+        return pd.concat([vlinder.query(query), plant.query(query), vogel.query(query)])
 
     except OSError:
         raise Exception('You\'re trying to open a files that lives only on the laptop of Hans Roelofsen, bad luck son.')
@@ -93,7 +91,7 @@ def parse_soort_sel(x):
 def get_250m_hokken():
     # return GeoDataFrame of 250m hokken, assumes fixed location
     try:
-        return gp.read_file(r'd:\hotspot_working\shp_250mgrid\hok250m.shp')
+        return gp.read_file(r'd:\hotspot_working\shp_250mgrid\hok250m_prov.shp')
     except OSError:
         raise Exception('You\'re trying to open a shapefile that lives only on the laptop of Hans Roelofsen.')
 
@@ -153,10 +151,20 @@ def get_snl_hokids(snl, treshold):
         with open(os.path.join(augurken_dir, snl_type + '.pkl'), 'rb') as handle:
             df = pickle.load(handle)
             holder.append(df.loc[df['area_m2'] >= treshold, :])
-    snl = pd.concat(holder)
+    snl_dat = pd.concat(holder)
+
+    # TODO: verschil tussen 0 en -9999 in de SNL grids
+
+    # read provincien
+    with open(os.path.join(augurken_dir, 'provincien.pkl'), 'rb') as handle:
+        prov = pickle.load(handle)
+
 
     # pivot on hok_id and report number of snl types per hok_id
-    print('\t\tFound {0} cells from {1} SNL type(s) with area gte {2}'.format(len(set(snl['hok_id'])),
+    print('\t\tFound {0} cells from {1} SNL type(s) with area gte {2}'.format(len(set(snl_dat['hok_id'])),
                                                                           len(snl), str(treshold)))
-    return pd.DataFrame(pd.pivot_table(data=snl, index='hok_id', values='area_m2',
-                                       aggfunc='count')).rename(columns={'area_m2':'snl_type_count'})
+
+    foo = pd.DataFrame(pd.pivot_table(data=snl_dat, index='hok_id', values='area_m2',
+                                       aggfunc={'area_m2': ['count', 'sum']})).rename(columns={'count': 'snl_count',
+                                                                                               'sum':'snl_area_m2'})
+    return pd.merge(left=foo, right=prov, left_index=True, right_on='hok_id', how='left')
