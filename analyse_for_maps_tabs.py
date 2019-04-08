@@ -11,8 +11,7 @@ from utils import pgo
 #======================================================================================================================#
 # define data selection and specification of difference map categories
 soort = 'all' #['all', 'vlinder', 'vogel', 'vaatplant']  # one of: vlinder, vaatplant, vogel, all
-# snl_types = ['N0201', 'N0301', 'N0401', 'N0402', 'N0403', 'N0404', 'N0501', 'N0502', 'N0601', 'N0602', 'N0603', 'N0604', 'N0605', 'N0606', 'N0701', 'N0702', 'N0801', 'N0802', 'N0803', 'N0804', 'N0901', 'N1001', 'N1002', 'N1101', 'N1201', 'N1202', 'N1203', 'N1204', 'N1205', 'N1206', 'N1301', 'N1302', 'N1401', 'N1402', 'N1403', 'N1501', 'N1502', 'N1601', 'N1602', 'N1603', 'N1604', 'N1701', 'N1702', 'N1703', 'N1704', 'N1705', 'N1706', 'N1800', 'N1900']  #'HalfnatuurlijkGrasland', 'OpenDuin', 'Heide', 'Bos', 'Moeras']  # iterable of SNL beheercodes OR  EcosysteemType naam
-snl_types = ['N1705', 'N1402', 'N1204']
+snl_types = ['N1705', 'N1402', 'N1204']  # snl_types = ['N0201', 'N0301', 'N0401', 'N0402', 'N0403', 'N0404', 'N0501', 'N0502', 'N0601', 'N0602', 'N0603', 'N0604', 'N0605', 'N0606', 'N0701', 'N0702', 'N0801', 'N0802', 'N0803', 'N0804', 'N0901', 'N1001', 'N1002', 'N1101', 'N1201', 'N1202', 'N1203', 'N1204', 'N1205', 'N1206', 'N1301', 'N1302', 'N1401', 'N1402', 'N1403', 'N1501', 'N1502', 'N1601', 'N1602', 'N1603', 'N1604', 'N1701', 'N1702', 'N1703', 'N1704', 'N1705', 'N1706', 'N1800', 'N1900']  #'HalfnatuurlijkGrasland', 'OpenDuin', 'Heide', 'Bos', 'Moeras']  # iterable of SNL beheercodes OR  EcosysteemType naam
 soort_lijst = ['SNL', 'Bijl1']  # iterable of soortenlijsten: SNL, Bijl1, EcoSysLijst
 periodes = ['1994-2001', '2002-2009', '2010-2017']  # select  from '2010-2017', '1994-2001', '2002-2009'
 labels = periodes
@@ -38,7 +37,10 @@ if report_stat == 'mean' and calculate_means is False:
     raise Exception('Set calculate_means to True when requesting means for reporting, you knob')
 
 # report histogram with cell count with 1, 2, 3 ... n species?
-cell_histogram = True
+cell_histogram = False
+
+# Species count aggregated to 'all' or per species group?
+count_per_species_group = True  # do not use in combination with cell histogram, differences and means!
 
 #======================================================================================================================#
 # specify output
@@ -77,12 +79,12 @@ for snl in snl_types:
 
     # cap Bijlage1 soorten to 2 per cell if requested
     if max_2_annex1:
+        # TODO: dit moet pas nadat er gedraaid is op unieke hokken!
         dat_sel['n'] = dat_sel.apply(lambda row: pgo.max2(row['soortlijst'], row['n']), axis=1)
 
     #==================================================================================================================#
     # create pivot table with stats per hok_id
-    dat_piv = pd.pivot_table(data=dat_sel, index='hok_id', columns='periode', values='n',
-                             aggfunc='sum')
+    dat_piv = pd.pivot_table(data=dat_sel, index='hok_id', columns='periode', values='n', aggfunc='sum')
     dat_piv.rename(columns=dict(zip(periodes, ['sum_' + p for p in periodes])), inplace=True)
 
     print('\tcontaining {0} cells with observations'.format(dat_piv.shape[0]))
@@ -91,10 +93,8 @@ for snl in snl_types:
     # Join to df with count and area beheertypen per cell
     snl_per_cell = pgo.get_snl_hokids(snl_list, 0)
     if set(dat_piv.index) - set(snl_per_cell['hok_id']):
-        warnings.warn('\t !! There are cells(s) with observations, but not marked as belonging to the SNL types!')
-    dat_piv = pd.merge(dat_piv, snl_per_cell, how='inner',
-                       left_index=True, right_on='hok_id')
-
+        warnings.warn('\tBeware, there are cells(s) with observations, but not marked as belonging to the SNL type(s)!')
+    dat_piv = pd.merge(dat_piv, snl_per_cell, how='inner', left_index=True, right_on='hok_id')
     del snl_per_cell
 
     #==================================================================================================================#
@@ -106,8 +106,8 @@ for snl in snl_types:
             dat_piv['mean_{0}'.format(periode)] = dat_piv.apply(lambda row: np.divide(row['sum_{0}'.format(periode)],
                                                                                       row['snl_count']), axis=1)
 
+    # Difference in sp count per cell between two periods. Calculate for the requested reporting stat
     if calculate_differences:
-        # Difference in sp count per cell between two periods. Calculate for the requested reporting stat
         report_col_names = [report_stat + '_' + p for p in diff_periodes]
         dat_piv.dropna(axis=0, how='any', subset=periodes, inplace=True)  # drop NAs, ie cells w/o obs in a period
         dat_piv['sp_count_diff'] = dat_piv.apply(lambda row: np.subtract(row[report_col_names[1]],
@@ -122,15 +122,22 @@ for snl in snl_types:
         hist_holder = []
         for periode in periodes:
             try:
-                hok_hist = pd.pivot_table(data=dat_piv.dropna(subset=['{0}_{1}'.format(x, y) for x,y in zip(['sum']*3,
-                                                                                                            periodes)],
-                                                              how='any', axis=0), index='sum_{0}'.format(periode),
-                                          values='hok_id', aggfunc='count')
+                # histogram based on dataframe with NAs removed in the Periode data columns
+                hok_hist_dat = dat_piv.dropna(subset=['{0}_{1}'.format(x, y) for x, y in zip(['sum']*3, periodes)],
+                                              how='any', axis=0)
+                hok_hist = pd.pivot_table(data=hok_hist_dat, index='sum_{0}'.format(periode), values='hok_id',
+                                          aggfunc='count')
                 hist_holder.append(pd.DataFrame(hok_hist).rename(columns={'hok_id':'cell_count_{0}'.format(periode)}))
-            except KeyError:
+                del hok_hist_dat
+            except KeyError:  # a period may be absent if there are no observations
                 continue
-        cell_hist = pd.merge(left=hist_holder[0], right=hist_holder[1], left_index=True, right_index=True, how='outer')
-        cell_hist = pd.merge(left=cell_hist, right=hist_holder[2], left_index=True, right_index=True, how='outer')
+        if len(hist_holder) > 1:
+            # TODO, 08/04/2019: dit kan vast netter!
+            cell_hist = pd.merge(left=hist_holder[0], right=hist_holder[1], left_index=True, right_index=True,
+                                 how='outer')
+            if len(hist_holder) > 2:
+                cell_hist = pd.merge(left=cell_hist, right=hist_holder[2], left_index=True, right_index=True,
+                                     how='outer')
 
     if print_diff_map or print_shp:
         # create geospatial object if needed
