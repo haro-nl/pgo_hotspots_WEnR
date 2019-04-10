@@ -8,10 +8,12 @@
 # By Hans Roelofsen, WEnR, 08/04/2019
 #
 #======================================================================================================================#
+
 import os
-import numpy as np
+import geopandas as gp
 import pandas as pd
 import warnings
+import numpy as np
 
 from utils import pgo
 
@@ -22,9 +24,6 @@ snl_types = ['N0201', 'N0301', 'N0401', 'N0402', 'N0403', 'N0404', 'N0501', 'N05
 soort_lijst = ['SNL', 'Bijl1']  # iterable of soortenlijsten: SNL, Bijl1, EcoSysLijst
 periodes = ['1994-2001', '2002-2009', '2010-2017']  # select  from '2010-2017', '1994-2001', '2002-2009'
 labels = periodes
-
-# cap Annex 1 soorten to 2 max per cell?
-max_2_annex1 = False
 
 #======================================================================================================================#
 # specify output
@@ -56,28 +55,58 @@ for snl in snl_types:
 
     #==================================================================================================================#
     # create pivot table with stats per hok_id
-    dat_piv = pd.pivot_table(data=dat_sel, index='hok_id', columns=['soortgroep', 'periode', 'soortlijst'], values='n',
-                             aggfunc='sum')
-    dat_piv.rename(columns=dict(zip(periodes, ['sum_' + p for p in periodes])), inplace=True)
+    dat_piv = pd.pivot_table(data=dat_sel, index='hok_id', columns=['periode', 'soortgroep', 'soortlijst'], values='n',
+                             aggfunc='sum', dropna=False)
+    dat_piv.replace(0.0, np.NaN, inplace=True)
 
     print('\tcontaining {0} cells with observations'.format(dat_piv.shape[0]))
     del dat_sel
+
+    # calculate total and capped Bijl1 soorten per periode
+    for periode in periodes:
+        try:
+            snl_only = dat_piv.xs((periode, 'SNL'), level=[0,2], axis=1)
+            bijl1_tot = snl_only.sum(axis=1)
+            bijl1_cap = pd.Series(np.where(bijl1_tot > 2, 2, bijl1_tot), index=bijl1_tot.index)
+            dat_piv[(periode, 'B1tot', '')] = bijl1_tot
+            dat_piv[(periode, 'B1cap', '')] = bijl1_cap
+        except KeyError:  # not all periods may be present
+            continue
 
     # Join to df with count and area beheertypen per cell
     snl_per_cell = pgo.get_snl_hokids(snl_list, 0)
     if set(dat_piv.index) - set(snl_per_cell['hok_id']):
         warnings.warn('\tBeware, there are cells(s) with observations, but not marked as belonging to the SNL type(s)!')
     dat_piv = pd.merge(dat_piv, snl_per_cell, how='inner', left_index=True, right_on='hok_id')
-    del snl_per_cell
+
+    del snl_per_cell, snl_only, bijl1_tot, bijl1_cap
 
     # Label with snl type
     dat_piv['snl_type'] = snl
+
+    # some shit to reduce colnames to 10 chars max
+    col_short = {'2010-2017': '1017', '1994-2001': '9401', '2002-2009': '0209', 'vogel': 'Vo', 'vlinder': 'Vl',
+                 'vaatplant': 'Pl', 'SNL': 'SNL', 'Bijl1': 'B1', 'cap': 'c', 'tot': 't'}
+    colnames = dat_piv.columns.tolist()
+    new_colnames = []
+    for col in colnames:
+        if isinstance(col, tuple):
+            tup_items = []
+            for x in col:
+                try:
+                    tup_items.append(col_short[x])
+                except KeyError:
+                    tup_items.append(x)
+            new_colnames.append(''.join(x for x in tup_items))
+        else:
+            new_colnames.append(col)
+    dat_piv.rename(columns=dict(zip(colnames, new_colnames)), inplace=True)
 
     #==================================================================================================================#
     # Generate output as requested
 
     # out base name
-    out_base_name = '{0}_Srt-{1}_Lst-{2}_Diff{3}_{4}'.format(snl, soort, ''.join([x for x in soort_lijst]),
+    out_base_name = '{0}_Srt-{1}_Lst-{2}_P{3}_{4}'.format(snl, soort, ''.join([x for x in soort_lijst]),
                                                              '-'.join([p for p in periodes]),
                                                              pgo.get_timestring('brief'))
 
@@ -88,10 +117,19 @@ for snl in snl_types:
                     'by Hans Roelofsen, {0}, WEnR team B&B.\n'.format(pgo.get_timestring('full')))
             f.write('# Query from PGO data was: {0}\n'.format(query))
 
-            if max_2_annex1:
-                f.write('# Bijlage 1 soorten were capped to 2 per cell\n')
-
             # write table with soorten count per hok
-            f.write(dat_piv.fillna(9999).to_csv(sep=';', header=True, index=False))
+            float64cols = [k for k, v in dat_piv.dtypes.astype(str).to_dict().items() if v == 'float64']
+            f.write(dat_piv.fillna(9999).astype(dtype=dict(zip(float64cols, [np.int32]*len(float64cols)))).to_csv(sep=';', header=True, index=False))
 
             print('\twritten to table at {0}'.format(pgo.get_timestring('full')))
+
+    if print_shp:
+        hokken = pgo.get_250m_hokken()  # geodataframe of 250m hokken
+        dat_gdf = pd.merge(left=dat_piv, right=hokken, left_on='hok_id', right_on='ID', how='inner')
+        dat_gdf = gp.GeoDataFrame(dat_gdf, crs={"init": "epsg:28992"})
+
+        dat_gdf.to_file(os.path.join(out_dir, 'shp', out_base_name + '.shp'))
+        print('\twritten to shapefile at {0}'.format(pgo.get_timestring('full')))
+
+
+

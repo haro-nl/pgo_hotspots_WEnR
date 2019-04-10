@@ -4,10 +4,11 @@
 import os
 import numpy as np
 import geopandas as gp
+import rasterio as rio
 from shapely import geometry
+import pandas as pd
 
 from utils import pgo
-
 
 def create_250m_hok(xy):
     # return X,Y coordinates of 125m sided square with vertices (a, b, c, d), clockwise starting from point a, topleft
@@ -23,16 +24,33 @@ def create_250m_hok(xy):
     return [(xmin, ymax), (xmax, ymax), (xmax, ymin), (xmin, ymin)]
 
 
-dat = pgo.get_all_obs()
-hokken = list(set(dat['hok_id']))
-hok_topleft_x = np.int32([id.split('_')[0] for id in hokken])
-hok_topleft_y = np.int32([id.split('_')[1] for id in hokken])
+asc = rio.open(os.path.join(r'd:\hotspot_working\a_broedvogels\SNL_grids', 'Heide.asc'))  #Example ASCII dataset
+specs = pgo.get_specs(r'd:\hotspot_working\a_broedvogels\SNL_grids', 'Heide.asc')
+vals = np.reshape(asc.read(1), newshape=np.product(asc.shape), order='C').astype(np.int32)
+
+db = pd.DataFrame({'hok': vals})
+db['row'] = np.array([[i] * specs['NCOLS'] for i in range(0, specs['NROWS'])]).reshape(np.product(asc.shape))
+db['col'] = np.array([i for i in range(0, specs['NCOLS'])] * specs['NROWS']).reshape(np.product(asc.shape))
+# note that coordinates are calculated for the row,col indices, which means they apply to the cell top-left!
+db['x_rd'] = db.apply(lambda x: ((x.col, x.row) * asc.affine)[0], axis=1).astype(np.int32)
+db['y_rd'] = db.apply(lambda x: ((x.col, x.row) * asc.affine)[1], axis=1).astype(np.int32)
+
 
 hok250 = gp.GeoDataFrame(crs={"init": "epsg:28992"})
-hok250['topleftx'] = hok_topleft_x
-hok250['toplefty'] = hok_topleft_y
+hok250['topleftx'] = db['x_rd']
+hok250['toplefty'] = db['y_rd']
 hok250['geometry'] = hok250.apply(lambda row: geometry.Polygon(create_250m_hok((row['topleftx'], row['toplefty']))),
                                   axis=1)
 hok250['ID'] = hok250.apply(lambda row: '{0}_{1}'.format(row['topleftx'], row['toplefty']), axis=1)
-print(hok250.head())
-hok250.to_file(r'd:\hotspot_working\shp_250mgrid\hok250m.shp')
+
+# read provincies and join to the hokken
+prov = gp.read_file(r'd:\NL\provincies\provincies.shp')
+
+hok_prov = gp.sjoin(left_df=hok250, right_df=prov, op='intersects', how='left')
+
+print(hok_prov.head())
+print(hok_prov.shape)
+print(hok250.shape)
+
+
+hok_prov.to_file(r'd:\hotspot_working\shp_250mgrid\hok250m_fullextent.shp')
