@@ -19,7 +19,7 @@ from utils import pgo
 
 #======================================================================================================================#
 # define data selection and specification of difference map categories
-soort = 'all' #['all', 'vlinder', 'vogel', 'vaatplant']  # one of: vlinder, vaatplant, vogel, all
+soort = 'all'  #['all', 'vlinder', 'vogel', 'vaatplant']  # one of: vlinder, vaatplant, vogel, all
 snl_types = ['N0201', 'N0301', 'N0401', 'N0402', 'N0403', 'N0404', 'N0501', 'N0502', 'N0601', 'N0602', 'N0603', 'N0604', 'N0605', 'N0606', 'N0701', 'N0702', 'N0801', 'N0802', 'N0803', 'N0804', 'N0901', 'N1001', 'N1002', 'N1101', 'N1201', 'N1202', 'N1203', 'N1204', 'N1205', 'N1206', 'N1301', 'N1302', 'N1401', 'N1402', 'N1403', 'N1501', 'N1502', 'N1601', 'N1602', 'N1603', 'N1604', 'N1701', 'N1702', 'N1703', 'N1704', 'N1705', 'N1706', 'N1800', 'N1900']  #'HalfnatuurlijkGrasland', 'OpenDuin', 'Heide', 'Bos', 'Moeras']  # iterable of SNL beheercodes OR  EcosysteemType naam
 soort_lijst = ['SNL', 'Bijl1']  # iterable of soortenlijsten: SNL, Bijl1, EcoSysLijst
 periodes = ['1994-2001', '2002-2009', '2010-2017']  # select  from '2010-2017', '1994-2001', '2002-2009'
@@ -65,10 +65,10 @@ for snl in snl_types:
     # calculate total and capped Bijl1 soorten per periode
     for periode in periodes:
         try:
-            snl_only = dat_piv.xs((periode, 'SNL'), level=[0,2], axis=1)
-            bijl1_tot = snl_only.sum(axis=1)
-            bijl1_cap = pd.Series(np.where(bijl1_tot > 2, 2, bijl1_tot), index=bijl1_tot.index)
-            dat_piv[(periode, 'B1tot', '')] = bijl1_tot
+            bijl1_only = dat_piv.xs((periode, 'Bijl1'), level=[0, 2], axis=1)
+            bijl1_tot = bijl1_only.sum(axis=1)  # sum per over rows, i.e. over species-groups
+            bijl1_cap = pd.Series(np.where(bijl1_tot > 2, 2, bijl1_tot), index=bijl1_tot.index)  # if > 2, then 2
+            dat_piv[(periode, 'B1tot', '')] = bijl1_tot  # add as new columns under the periode
             dat_piv[(periode, 'B1cap', '')] = bijl1_cap
         except KeyError:  # not all periods may be present
             continue
@@ -79,12 +79,12 @@ for snl in snl_types:
         warnings.warn('\tBeware, there are cells(s) with observations, but not marked as belonging to the SNL type(s)!')
     dat_piv = pd.merge(dat_piv, snl_per_cell, how='inner', left_index=True, right_on='hok_id')
 
-    del snl_per_cell, snl_only, bijl1_tot, bijl1_cap
+    del snl_per_cell, bijl1_only, bijl1_tot, bijl1_cap
 
     # Label with snl type
     dat_piv['snl_type'] = snl
 
-    # some shit to reduce colnames to 10 chars max
+    # Reduce colnames to 10 chars max
     col_short = {'2010-2017': '1017', '1994-2001': '9401', '2002-2009': '0209', 'vogel': 'Vo', 'vlinder': 'Vl',
                  'vaatplant': 'Pl', 'SNL': 'SNL', 'Bijl1': 'B1', 'cap': 'c', 'tot': 't'}
     colnames = dat_piv.columns.tolist()
