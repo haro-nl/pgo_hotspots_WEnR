@@ -42,7 +42,7 @@ for file in os.listdir(vogel_dir):
         continue
 
 df_all = pd.concat(holder)
-df_all.to_csv(os.path.join(vogel_dir, 'vogel_all2.csv'), index=False, sep=';')
+df_all.to_csv(os.path.join(vogel_dir, 'vogel_all3.csv'), index=False, sep=';')
 
 # Run for all SNL grids
 snl_dir = r'd:\hotspot_working\a_broedvogels\SNL_grids'

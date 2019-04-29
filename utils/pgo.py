@@ -94,11 +94,11 @@ def query_all_obs(query):
     relevant_cols = ['periode', 'snl', 'n', 'hok_id', 'soortlijst', 'soortgroep']
 
     try:
-        vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all.txt', comment='#', sep=';',
+        vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all_v2.txt', comment='#', sep=';',
                               usecols=relevant_cols)
         plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all2.csv', comment='#', sep=';',
                             usecols=relevant_cols)
-        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all2.csv',
+        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all3.csv',
                             comment='#', sep=';', usecols=relevant_cols)
         return pd.concat([vlinder.query(query), plant.query(query), vogel.query(query)])
 

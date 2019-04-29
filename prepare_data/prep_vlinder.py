@@ -42,7 +42,7 @@ print(list(vl_1ai_bijl1))
 # vlinder_1aii: bevat VHR soortenlijsten per cell
 vl_1aii = pd.read_csv(os.path.join(vlinder_dir, vlinder_1aii), comment='#', sep=';', header=0)
 vl_1aii = add_hok_id(vl_1aii)  # add hok IDs
-
+vl_1aii['snl'] = 'geen'
 vl_1aii['soortlijst'] = 'VHR'
 vl_1aii.rename(columns={'N_HR_TypSrt': 'n'}, inplace=True)
 print(list(vl_1aii))
@@ -55,9 +55,9 @@ vl_2c.rename(columns={'ecosysteemtype_nm': 'snl', 'N_KenmSrt':'n'}, inplace=True
 vl_2c.drop(labels='N_Bijl1Srt', inplace=True, axis=1)
 print(list(vl_2c))
 
-vlinder_all = pd.concat([vl_1ai_snl, vl_1ai_bijl1, vl_2c])
+vlinder_all = pd.concat([vl_1ai_snl, vl_1ai_bijl1, vl_1aii, vl_2c])
 vlinder_all.drop(labels='id', axis=1, inplace=True)
 vlinder_all.rename(columns={'x250': 'x_rd', 'y250': 'y_rd'}, inplace=True)
 vlinder_all['soortgroep'] = 'vlinder'
-vlinder_all.to_csv(os.path.join(vlinder_dir, 'vlinder_all.txt'),
+vlinder_all.to_csv(os.path.join(vlinder_dir, 'vlinder_all_v2.txt'),
                    index=False, sep=';')
