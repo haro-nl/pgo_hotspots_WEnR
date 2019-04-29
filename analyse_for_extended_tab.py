@@ -20,7 +20,7 @@ from utils import pgo
 #======================================================================================================================#
 # define data selection and specification of difference map categories
 soort = 'all'  #['all', 'vlinder', 'vogel', 'vaatplant']  # one of: vlinder, vaatplant, vogel, all
-snl_types = ['HalfnatuurlijkGrasland', 'OpenDuin', 'Heide', 'Bos', 'Moeras', 'geen']  # iterable of SNL beheercodes OR  EcosysteemType naam
+snl_types = ['HalfnatuurlijkGrasland', 'OpenDuin', 'Heide', 'Bos', 'Moeras', 'all']  # iterable of SNL beheercodes OR  EcosysteemType naam
 soort_lijst = ['VHR']  # iterable of soortenlijsten: SNL, Bijl1, EcoSysLijst, VHR
 periodes = ['1994-2001', '2002-2009', '2010-2017']  # select  from '2010-2017', '1994-2001', '2002-2009'
 labels = periodes
@@ -101,7 +101,7 @@ for snl in snl_types:
             for x in col:
                 try:
                     tup_items.append(col_short[x])
-                except KeyError:    
+                except KeyError:
                     tup_items.append(x)
             new_colnames.append(''.join(x for x in tup_items))
         else:
