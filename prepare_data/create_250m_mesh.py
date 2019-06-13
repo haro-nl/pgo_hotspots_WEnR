@@ -44,7 +44,7 @@ hok250['geometry'] = hok250.apply(lambda row: geometry.Polygon(create_250m_hok((
 hok250['ID'] = hok250.apply(lambda row: '{0}_{1}'.format(row['topleftx'], row['toplefty']), axis=1)
 
 # read provincies and join to the hokken
-prov = gp.read_file(r'd:\NL\provincies\provincies.shp')
+prov = gp.read_file(r'd:\NL\provincies_2018\poly\provincies_2018.shp')
 
 hok_prov = gp.sjoin(left_df=hok250, right_df=prov, op='intersects', how='left')
 
@@ -53,4 +53,4 @@ print(hok_prov.shape)
 print(hok250.shape)
 
 
-hok_prov.to_file(r'd:\hotspot_working\shp_250mgrid\hok250m_fullextent.shp')
+# hok_prov.to_file(r'd:\hotspot_working\shp_250mgrid\hok250m_fullextent.shp')

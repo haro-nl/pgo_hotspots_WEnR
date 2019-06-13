@@ -20,14 +20,14 @@ from utils import pgo
 #======================================================================================================================#
 # define data selection and specification of difference map categories
 soort = 'all'  #['all', 'vlinder', 'vogel', 'vaatplant']  # one of: vlinder, vaatplant, vogel, all
-snl_types = ['HalfnatuurlijkGrasland', 'OpenDuin', 'Heide', 'Bos', 'Moeras', 'all']  # iterable of SNL beheercodes OR  EcosysteemType naam
-soort_lijst = ['VHR']  # iterable of soortenlijsten: SNL, Bijl1, EcoSysLijst, VHR
+snl_types = ['N0201', 'N0301', 'N0401', 'N0402', 'N0403', 'N0404', 'N0501', 'N0502', 'N0601', 'N0602', 'N0603', 'N0604', 'N0605', 'N0606', 'N0701', 'N0702', 'N0801', 'N0802', 'N0803', 'N0804', 'N0901', 'N1001', 'N1002', 'N1101', 'N1201', 'N1202', 'N1203', 'N1204', 'N1205', 'N1206', 'N1301', 'N1302', 'N1401', 'N1402', 'N1403', 'N1501', 'N1502', 'N1601', 'N1602', 'N1603', 'N1604', 'N1701', 'N1702', 'N1703', 'N1704', 'N1705', 'N1706', 'N1800', 'N1900']  # iterable of SNL beheercodes OR  EcosysteemType naam
+soort_lijst = ['SNL', 'Bijl1']  # iterable of soortenlijsten: SNL, Bijl1, EcoSysLijst, VHR
 periodes = ['1994-2001', '2002-2009', '2010-2017']  # select  from '2010-2017', '1994-2001', '2002-2009'
 labels = periodes
 
 #======================================================================================================================#
 # specify output
-out_dir = r'd:\hotspot_working\z_out\20190408'
+out_dir = r'd:\hotspot_working\z_out\20190612'
 print_table = False
 print_shp = False
 print_all_tables = True
@@ -36,7 +36,6 @@ holder = []
 
 #======================================================================================================================#
 # Analyse per snl type
-
 for snl in snl_types:
 
     print('\n{0} in progress at {1}'.format(snl, pgo.get_timestring('full')))
@@ -58,8 +57,8 @@ for snl in snl_types:
 
     #==================================================================================================================#
     # create pivot table with stats per hok_id
-    dat_piv = pd.pivot_table(data=dat_sel, index='hok_id', columns=['periode', 'soortgroep', 'soortlijst'], values='n',
-                             aggfunc='sum', dropna=False)
+    dat_piv = pd.pivot_table(data=dat_sel, index='hok_id', columns=['periode', 'soortgroep', 'soortlijst'],
+                             values='n', aggfunc='sum', dropna=False)
     dat_piv.replace(0.0, np.NaN, inplace=True)
 
     print('\tcontaining {0} cells with observations'.format(dat_piv.shape[0]))
@@ -142,20 +141,23 @@ for snl in snl_types:
 
 if print_all_tables:
 
-    dat_out = pd.concat(holder)
+    dat_out = pd.concat(holder)  #note that contac adds missing columns automitcally!
+
     out_name = 'SNL-All_Srt-{0}_Lst-{1}_P{2}_{3}'.format(soort, ''.join([x for x in soort_lijst]),
-                                                         '-'.join([p for p in periodes]), pgo.get_timestring('brief'))
-    with open(os.path.join(out_dir, out_base_name + '.csv'), 'w') as f:
+                                                         '-'.join([p for p in periodes]),
+                                                         pgo.get_timestring('brief'))
+
+    with open(os.path.join(out_dir, out_name + '.csv'), 'w') as f:
         # header
         f.write('# Tabulated extract PGO Hotspots data, '
                 'by Hans Roelofsen, {0}, WEnR team B&B.\n'.format(pgo.get_timestring('full')))
         f.write('# Query from PGO data was: {0}\n'.format(query))
 
-        # write table with soorten count per hok
-        float64cols = [k for k, v in dat_out.dtypes.astype(str).to_dict().items() if v == 'float64']
-        f.write(dat_out.fillna(9999).astype(dtype=dict(zip(float64cols, [np.int32] * len(float64cols)))).to_csv(sep=';',
-                                                                                                                header=True,
-                                                                                                                index=False))
-        print('\twritten to table at {0}'.format(pgo.get_timestring('full')))
+    # write table with soorten count per hok
+        float64cols = [k for k, v in dat_piv.dtypes.astype(str).to_dict().items() if v == 'float64']
+        f.write(dat_out.fillna(9999).astype(dtype=dict(zip(float64cols, [np.int32] * len(float64cols)))).
+                to_csv(sep=';', header=True, index=False))
+
+    print('\twritten to table at {0}'.format(pgo.get_timestring('full')))
 
 

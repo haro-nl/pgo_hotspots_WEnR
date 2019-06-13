@@ -96,9 +96,9 @@ def query_all_obs(query):
     try:
         vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all_v2.txt', comment='#', sep=';',
                               usecols=relevant_cols)
-        plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all2.csv', comment='#', sep=';',
+        plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all4.csv', comment='#', sep=';',
                             usecols=relevant_cols)
-        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all3.csv',
+        vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all4.csv',
                             comment='#', sep=';', usecols=relevant_cols)
         return pd.concat([vlinder.query(query), plant.query(query), vogel.query(query)])
 
@@ -214,7 +214,7 @@ def get_timestring(timetype):
 
 def get_snl_hokids(snl, treshold):
     # function to get df of 250m hokken from *snl* beheertypes and/or ecosysteemtypes where the area exceeds *treshold*
-    # returns df where: hok_id = hok_id, snl_count = aantal snl types aanwezig in hok
+    # returns df where: hok_id = hok_id, snl_count = aantal snl types aanwezig in hok, prov=provincie
     # reads pickled PD dataframes of of snl type, hard-coded to Hans Roelofsen laptop
 
     # always iterate of the requested snl types
