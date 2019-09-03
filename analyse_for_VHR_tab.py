@@ -28,7 +28,7 @@ labels = periodes
 
 #======================================================================================================================#
 # specify output
-out_dir = r'd:\hotspot_working\z_out\20190408'
+out_dir = r'd:\hotspot_working\z_out\20190619'
 print_table = False
 print_shp = False
 print_all_tables = True
@@ -57,10 +57,10 @@ print('\tcontaining {0} cells with observations'.format(dat_piv.shape[0]))
 del dat_sel
 
 # Join to df with count and area beheertypen per cell
-snl_per_cell = pgo.get_snl_hokids('all', 0)
+snl_per_cell = pgo.get_snl_hokids('all', 0)  ## Note, this retrieves ALL 250m hokken!
 if set(dat_piv.index) - set(snl_per_cell['hok_id']):
     warnings.warn('\tBeware, there are cells(s) with observations, but not marked as belonging to the SNL type(s)!')
-dat_piv = pd.merge(dat_piv, snl_per_cell, how='inner', left_index=True, right_on='hok_id')
+dat_piv2 = pd.merge(dat_piv, snl_per_cell, how='left', left_index=True, right_on='hok_id')
 
 del snl_per_cell
 

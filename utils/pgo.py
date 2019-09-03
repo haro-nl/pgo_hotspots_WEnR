@@ -96,11 +96,32 @@ def query_all_obs(query):
     try:
         vlinder = pd.read_csv(r'd:\hotspot_working\c_vlinders\vlinder_all_v2.txt', comment='#', sep=';',
                               usecols=relevant_cols)
-        plant = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all4.csv', comment='#', sep=';',
-                            usecols=relevant_cols)
+
+        plant_snl = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all_snl.csv',
+                            comment='#', sep=';', usecols=relevant_cols)
+
+        plant_bijl1 = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all_Bijl1.csv',
+                            comment='#', sep=';', usecols=relevant_cols)
+
+        plant_vhr = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all_VHR.csv',
+                            comment='#', sep=';', usecols=relevant_cols)
+
+        plant_eco = pd.read_csv(r'd:\hotspot_working\b_vaatplanten\Soortenrijkdom\vaatplant_all_EcoSysLijst.csv',
+                            comment='#', sep=';', usecols=relevant_cols)
+
         vogel = pd.read_csv(r'd:\hotspot_working\a_broedvogels\Soortenrijkdom\Species_richness\vogel_all4.csv',
                             comment='#', sep=';', usecols=relevant_cols)
-        return pd.concat([vlinder.query(query), plant.query(query), vogel.query(query)])
+
+        out = pd.concat([vlinder.query(query), plant_snl.query(query), plant_bijl1.query(query),
+                          plant_vhr.query(query), plant_eco.query(query), vogel.query(query)])
+
+        print('\tFound {0} records complying to query'.format(out.shape[0]))
+        print('\t\tSet periode: {0}'.format(set(out.periode)))
+        print('\t\tSet snl: {0}'.format(set(out.snl)))
+        print('\t\tSet soortlijst: {0}'.format(set(out.soortlijst)))
+        print('\t\tSet soortgroep: {0}'.format(set(out.soortgroep)))
+
+        return out
 
     except OSError:
         raise Exception('You\'re trying to open a files that lives only on the laptop of Hans Roelofsen, bad luck son.')
@@ -225,6 +246,8 @@ def get_snl_hokids(snl, treshold):
     holder = []
     augurken_dir = r'd:\hotspot_working\a_broedvogels\SNL_grids\augurken'
     for snl_type in snl:
+        if snl_type == 'all':
+            raise Exception('You are requesting a table of all 250m hokken, not just of all SNL hokken. Beware!')
         with open(os.path.join(augurken_dir, snl_type + '.pkl'), 'rb') as handle:
             df = pickle.load(handle)
             holder.append(df.loc[df['area_m2'] >= treshold, :])
@@ -234,6 +257,8 @@ def get_snl_hokids(snl, treshold):
 
     # read provincien
     with open(os.path.join(augurken_dir, 'provincien.pkl'), 'rb') as handle:
+        raise Exception('Sorry, you must fix the Provincien pkl first. provincien.pkl does not include the new'
+                        'Utrecht AND contains > 1 provincie per hok.')
         prov = pickle.load(handle)
 
     # pivot on hok_id and report number of snl types per hok_id
@@ -243,4 +268,6 @@ def get_snl_hokids(snl, treshold):
     foo = pd.DataFrame(pd.pivot_table(data=snl_dat, index='hok_id', values='area_m2',
                                       aggfunc={'area_m2': ['count', 'sum']})).rename(columns={'count': 'snl_count',
                                                                                               'sum': 'snl_area_m2'})
-    return pd.merge(left=foo, right=prov, left_index=True, right_on='hok_id', how='left')
+
+    return pd.merge(left=foo, right=prov, left_index=True, right_on='hok_id', how='inner')
+
